@@ -1,12 +1,15 @@
 import { CreateUserDto } from './dto/create-user.dto';
 import { BadRequestException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
-import { UpdateAuthDto } from './dto/update-auth.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from './entities/user.entity';
 
+import { UpdateAuthDto, RegisterUserDto, LoginDto } from './dto/index';
 import * as bcryptjs from 'bcryptjs';
-import { LoginDto } from './dto/login.dto';
+import { JwtService } from '@nestjs/jwt';
+import { JwtPayload } from './interfaces/jwt.payload';
+import { LoginResponse } from './interfaces/login-responde';
+
 
 @Injectable()
 export class AuthService {
@@ -14,6 +17,7 @@ export class AuthService {
     constructor(
         @InjectModel(User.name) 
         private userModel: Model<User>,
+        private jwtSevice: JwtService
     ) {}
 
 
@@ -46,8 +50,17 @@ export class AuthService {
         //3 - Generar el JWT
     }
 
+    async register(registerDto: RegisterUserDto): Promise<LoginResponse>{
 
-    async login(loginDto: LoginDto){
+        const user = await this.create(registerDto);
+
+        return {
+            user: user,
+            token: this.getJwtToken({id: user._id})
+        }
+    }
+
+    async login(loginDto: LoginDto):Promise<LoginResponse>{
         const {email, password} = loginDto;
 
         const user = await this.userModel.findOne({email});
@@ -64,13 +77,13 @@ export class AuthService {
 
         return {
             user: rest,
-            token: 'ABC-123'
+            token: this.getJwtToken({id:user.id})
         };
         
     }
 
-    findAll() {
-        return `This action returns all auth`;
+    findAll(): Promise<User[]> {
+        return this.userModel.find();
     }
 
 
@@ -85,5 +98,10 @@ export class AuthService {
 
     remove(id: number) {
         return `This action removes a #${id} auth`;
+    }
+
+    getJwtToken(payload: JwtPayload){
+        const token = this.jwtSevice.sign(payload);
+        return token;
     }
 }
